@@ -2,11 +2,13 @@
 #include <elf.h>
 #include <string.h>
 #include <stdlib.h>
-#include "Hash.h"
-#include "ProcessSingleFile.h"
-#include "GlobalDefs.h"
-char c=(char)0xff;
-int isEverythingInitialed;
+#include "utils/Hash.h"
+#include "process/ProcessSingleFile.h"
+#include "common/GlobalDefs.h"
+#include "process/LinkAndRelocate.h"
+
+//char __attribute__((weak)) MergeSymtab;
+//int isEverythingInitialed;
 int Endianness;
 
 
@@ -18,7 +20,7 @@ int CheckPlatform(Elf64_Ehdr *head);
 enum Error{INVALID_ELF=1,FILE_IO_FAILED,INVALID_OPTION=-1};
 
 int main(int argc, char **argv){
-//    printf("Hello, World!\n");
+//    printf("%p\n",&MergeSymtab);
     Initialize();
     inputfiles=malloc(argc*sizeof(char *));
     int inputFileNum=0;
@@ -27,35 +29,46 @@ int main(int argc, char **argv){
         else inputfiles[inputFileNum++]=argv[i];
     }
     FileSections fileSections[inputFileNum];
+    ProcessFile(0,0);
     for(int i=0;i<inputFileNum;++i){
-        int ret;
         currentFilename=inputfiles[i];
         curFileIndex=i;
         curFileSections=fileSections+curFileIndex;
-        if((ret=ReadFile(argv[i]))) return ret;
+        if((ReadFile(argv[i]))) error=1;
     }
-    return 0;
+    if(!error){
+        if(LinkAndRelocate()) return error;
+    }
+    return error;
 }
 int CheckPlatform(Elf64_Ehdr *head){
     int ret=INVALID_ELF;
-    if(head->e_type!=ET_REL){ printf("%s is not a relocatable file!\n", currentFilename);goto ret; }
+    if(head->e_type!=ET_REL){
+        if(head->e_type==ET_DYN){
+            curFileSections->isDynamicLib=true;
+        }
+        else{
+            printf("%s is not a relocatable file!\n", currentFilename);
+            goto ret;
+        }
+    }
     if(head->e_machine!=EM_X86_64||head->e_flags||head->e_ehsize!=sizeof(Elf64_Ehdr)){ printf("%s is not a x86-64 file!\n",currentFilename);goto ret;}
     ret=0;
     ret:
     return ret;
 }
 int CheckHead(Elf64_Ehdr *head){
-    if(isEverythingInitialed){
-        if(memcmp(head,&Glob_Head,20)&&(head->e_flags!=Glob_Head.e_flags)&&(head->e_ehsize!=Glob_Head.e_ehsize)) goto ret;
-        return 0;
-    }
+//    if(isEverythingInitialed){
+//        if(memcmp(head,&Glob_Head,20)&&(head->e_flags!=Glob_Head.e_flags)&&(head->e_ehsize!=Glob_Head.e_ehsize)) goto ret;
+//        return 0;
+//    }
     if(!memcmp(head->e_ident,"\x7f""ELF",4)){
         if(head->e_ident[EI_VERSION]==ELFCLASS64){
             if(head->e_ident[EI_DATA]&3 && head->e_ident[EI_DATA]!=3){
                 Endianness=head->e_ident[EI_DATA]==ELFDATA2LSB;
                 if(head->e_ident[EI_VERSION]==EV_CURRENT){
                     if(!*(int64_t *)(&head->e_ident[EI_PAD])){
-                        isEverythingInitialed=1;
+//                        isEverythingInitialed=1;
                         memcpy(&Glob_Head,head,sizeof(Glob_Head));
                         return CheckPlatform(head);
                     }

@@ -6,8 +6,8 @@
 #define LD_SECTIONDEF_H
 #include <elf.h>
 #include <stdbool.h>
-#include "list.h"
-#include "Hash.h"
+#include "../utils/list.h"
+#include "../utils/Hash.h"
 
 #define Get_InnerSection_From_List(list) ((InnerSection *)(list->data))
 
@@ -38,6 +38,7 @@ typedef struct _SymSection{
     uint64_t index;
 }SymSection;
 typedef struct _FileSections{
+    bool isDynamicLib;
     SectionDef *sections;
     uint64_t secShStr;
 }FileSections;

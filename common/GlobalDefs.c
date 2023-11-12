@@ -9,11 +9,11 @@ FileSections *curFileSections;
 int curFileIndex;
 char **inputfiles;
 Set GlobalSymSet;
+int error=0;
 //Set sectionSet;
 //DynSection dynSection;
 //SymSection symSection;
 FileSections *curFileSections;
-void __attribute__((weak)) c=1;
 #include "stdio.h"
 void Initialize(){
 //    printf("%ld",c);
