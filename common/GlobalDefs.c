@@ -8,7 +8,7 @@ Elf64_Ehdr Glob_Head;
 FileSections *curFileSections;
 int curFileIndex;
 char **inputfiles;
-Set GlobalSymSet;
+Set GlobalSymSet,DynSymSet;
 int error=0;
 //Set sectionSet;
 //DynSection dynSection;
@@ -17,5 +17,6 @@ FileSections *curFileSections;
 #include "stdio.h"
 void Initialize(){
 //    printf("%ld",c);
-//    Set_Initialize(&symSection.syms);
+    Set_Initialize(&DynSymSet);
+    Set_Initialize(&GlobalSymSet);
 }

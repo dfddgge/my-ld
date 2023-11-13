@@ -8,14 +8,19 @@
 #include "ProcessSingleFile.h"
 #include "../utils/Hash.h"
 #include "../common/SectionDef.h"
+#include "LinkAndRelocate.h"
 
 //static Set SectionSetSingle;
 //uint64_t *StrTable;
-int MergeSymtab(SectionDef *src,uint16_t symstr);
+int MergeSymtab(SectionDef *src,uint16_t symstr,bool isDynamic);
 //
 //void MergeDyntab(DynSection *glob, SectionDef *src);
 int ProcessFile(FILE *file, Elf64_Ehdr *head){
+//    if(){
+//        return 0;
+//    }
     SectionDef *sections=curFileSections->sections=malloc(head->e_shnum*sizeof(SectionDef));
+    curFileSections->sectionSize=head->e_shnum;
     uint32_t symTab,dynSec,symstr;
     fseek(file,(long)head->e_shoff,SEEK_SET);
     for(int i=0;i<head->e_shnum;++i){
@@ -35,13 +40,14 @@ int ProcessFile(FILE *file, Elf64_Ehdr *head){
     for(int i=0;i<head->e_shnum;++i){
         sections[i].sectionName=&sections[curFileSections->secShStr].secAddr[((uint64_t)sections[i].sectionName)&0xffffffff];
         unsigned long len=strlen(sections[i].sectionName);
-        if(len==7&&!strcmp(sections[i].sectionName,".symtab")){sections[i].isNotProcessSec=1; symTab=i; }
-        else if(len==8&&!strcmp(sections[i].sectionName,".dynamic")){sections[i].isNotProcessSec=1; dynSec=i; }
-        else if(len==8&&!strcmp(sections[i].sectionName,".strtab")){sections[i].isNotProcessSec=1; symstr=i; }
+        if(len==7&&((!curFileSections->isDynamicLib&&!strcmp(sections[i].sectionName,".symtab"))||(curFileSections->isDynamicLib&&!strcmp(sections[i].sectionName,".dynsym")))){sections[i].isNotProcessSec=1; symTab=i; }
+        else if(len==8&&!strcmp(sections[i].sectionName,".dynamic")){sections[i].isNotProcessSec=1; curFileSections->secDyn=i; }
+        else if(len==7&&((!curFileSections->isDynamicLib&&!strcmp(sections[i].sectionName,".strtab"))||(curFileSections->isDynamicLib&&!strcmp(sections[i].sectionName,".dynstr")))){sections[i].isNotProcessSec=1; symstr=i; }
     }
-    if(MergeSymtab(&sections[symTab],symstr)) return -1;
-    //todo:process .dynamic and .dynsym etc on dynamic lib
-
+    if(MergeSymtab(&sections[symTab],symstr,curFileSections->isDynamicLib)) return -1;
+//    not_used_todo:process .dynamic and .dynsym etc on dynamic lib
+//   reason:process in link and relocate
+    return 0;
 }
 //void MergeDyntab(DynSection *glob, SectionDef *src){
 //}
@@ -51,15 +57,15 @@ int ProcessFile(FILE *file, Elf64_Ehdr *head){
 //weak & weak-> use the defined, if more than two defined, use the first one, maybe a randomly chosen, UB?
 //gnu ld does not care about the type of symbol!
 
-int MergeSymtab(SectionDef *src,uint16_t symstr){
+int MergeSymtab(SectionDef *src,uint16_t symstr,bool isDynamic){
     int ret=0;
     Elf64_Sym *info=(Elf64_Sym *)(src->secAddr);
     unsigned long num=src->sectionHeader.sh_size/src->sectionHeader.sh_entsize;
     for(int i=1;i<num;++i){
         char *name=&((char *)curFileSections->sections[symstr].secAddr)[info[i].st_name];
-        SymStore *symStore=GetSymStructFromSymSet(name);
+        SymStore *symStore=GetSymStructFromSymSet(name,isDynamic);
         SymStore newStore={curFileIndex,name,info[i]};
-        if(!symStore) Set_Insert(&GlobalSymSet,&newStore,name,sizeof(SymStore));
+        if(!symStore) Set_Insert(GetCurSymSet(isDynamic),&newStore,name,sizeof(SymStore));
         else{
             uint8_t curBind=ELF64_ST_BIND(info[i].st_info), storeBind=ELF64_ST_BIND(symStore->sym_info.st_info);
             uint8_t curType=ELF64_ST_TYPE(info[i].st_info), storeType=ELF64_ST_TYPE(symStore->sym_info.st_info);
@@ -78,10 +84,10 @@ int MergeSymtab(SectionDef *src,uint16_t symstr){
                         }
                     }
                     else if(symStore->sym_info.st_shndx==STN_UNDEF&&info[i].st_shndx!=STN_UNDEF)
-                        Set_Replace(&GlobalSymSet, &newStore, name, sizeof(newStore));
+                        Set_Replace(GetCurSymSet(isDynamic), &newStore, name, sizeof(newStore));
                 }
                 else if(curBind==STB_GLOBAL){
-                    Set_Replace(&GlobalSymSet, &newStore, name, sizeof(newStore));
+                    Set_Replace(GetCurSymSet(isDynamic), &newStore, name, sizeof(newStore));
                 }
 //            }
         }

@@ -21,8 +21,9 @@ typedef struct _SymStore{
     Elf64_Sym sym_info;
 }SymStore;
 
-#define GetSymStructFromSymSet(str) ((SymStore *)(Set_Find(&GlobalSymSet,str)))
-extern Set GlobalSymSet;
+#define GetSymStructFromSymSet(str,isDynamic) ((SymStore *)(Set_Find(GetCurSymSet(isDynamic),str)))
+#define GetCurSymSet(isDynamic) ((isDynamic)?&DynSymSet:&GlobalSymSet)
+extern Set GlobalSymSet,DynSymSet;
 //extern Set sectionSet;
 //extern DynSection dynSection;
 //extern SymSection symSection;

@@ -4,5 +4,6 @@
 
 #ifndef LD_LINKANDRELOCATE_H
 #define LD_LINKANDRELOCATE_H
-int LinkAndRelocate();
+#include <stdint.h>
+int LinkAndRelocate(FileSections *fileSections, int inputfileNum);
 #endif //LD_LINKANDRELOCATE_H

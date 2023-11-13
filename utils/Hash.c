@@ -14,7 +14,7 @@ uint8_t HashString(char *str){
     return res;
 }
 void Set_Initialize(Set *set){
-    memset(set->data,0,sizeof(Set));
+    memset(set,0,sizeof(Set));
 }
 bool Set_Insert(Set *set, void *data, char *str,uint32_t size){
     uint8_t hash=HashString(str);
@@ -25,11 +25,11 @@ bool Set_Insert(Set *set, void *data, char *str,uint32_t size){
         curFront=cur;
 //        cur=(struct InSetUnit *)cur->data->next;
     }
-    curFront->data->next=malloc(sizeof(struct InSetUnit));
-    curFront->data->data=malloc(size);
+    cur=(struct InSetUnit *)(curFront->data->next=malloc(sizeof(struct InSetUnit)));
+    cur->data=malloc(size);
     memcpy(curFront->data,data,size);
-    curFront->str=malloc(strlen(str)+1);
-    strcpy(curFront->str,str);
+    cur->str=malloc(strlen(str)+1);
+    strcpy(cur->str,str);
     return true;
 }
 void *Set_Find(Set *set, char *str){

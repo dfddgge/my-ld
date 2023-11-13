@@ -24,6 +24,7 @@ typedef struct _SectionDef{
     char *sectionName;
     Elf64_Shdr sectionHeader;
     char *secAddr;
+    uint64_t outputOffset;
 //    List *sections;
 }SectionDef;
 typedef struct _MemoryRange{
@@ -39,8 +40,12 @@ typedef struct _SymSection{
 }SymSection;
 typedef struct _FileSections{
     bool isDynamicLib;
+    uint16_t sectionSize;
     SectionDef *sections;
     uint64_t secShStr;
+    int secDyn;
+    int *rel;
+    int relNum;
 }FileSections;
 //void SectionDef_Initialize(SectionDef *sectionDef);
 //int SectionDef_Merge(SectionDef *dst,SectionDef *src);//Merge Don't need to Free

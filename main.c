@@ -29,7 +29,7 @@ int main(int argc, char **argv){
         else inputfiles[inputFileNum++]=argv[i];
     }
     FileSections fileSections[inputFileNum];
-    ProcessFile(0,0);
+//    ProcessFile(0,0);
     for(int i=0;i<inputFileNum;++i){
         currentFilename=inputfiles[i];
         curFileIndex=i;
@@ -37,7 +37,7 @@ int main(int argc, char **argv){
         if((ReadFile(argv[i]))) error=1;
     }
     if(!error){
-        if(LinkAndRelocate()) return error;
+        if(LinkAndRelocate(fileSections, inputFileNum)) return error;
     }
     return error;
 }
