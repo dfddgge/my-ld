@@ -19,6 +19,7 @@ typedef struct _SymStore{
     int fileIndex;
     char *sym;
     Elf64_Sym sym_info;
+    int outIndex;
 }SymStore;
 
 #define GetSymStructFromSymSet(str,isDynamic) ((SymStore *)(Set_Find(GetCurSymSet(isDynamic),str)))

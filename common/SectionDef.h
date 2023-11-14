@@ -46,6 +46,9 @@ typedef struct _FileSections{
     int secDyn;
     int *rel;
     int relNum;
+//    int hash;
+    int secSym;
+    int symstr;
 }FileSections;
 //void SectionDef_Initialize(SectionDef *sectionDef);
 //int SectionDef_Merge(SectionDef *dst,SectionDef *src);//Merge Don't need to Free

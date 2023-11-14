@@ -70,6 +70,21 @@ void Set_Clear(Set *set){
     Set_Free(set);
     Set_Initialize(set);
 }
+uint32_t Elf_Hash(char *str){
+    unsigned int hash=0;
+    unsigned int x=0;
+    while(*str)
+    {
+        hash=(hash<<4)+*str;
+        if((x=hash & 0xf0000000)!=0)
+        {
+            hash^=(x>>24);
+            hash&=~x;
+        }
+        str++;
+    }
+    return (hash & 0x7fffffff);
+}
 
 
 

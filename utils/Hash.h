@@ -18,10 +18,12 @@ struct _Set{
 };
 typedef struct _Set Set;
 void Set_Initialize(Set *set);
-bool Set_Insert(Set *set,void *data,char *str,uint32_t size);
-void *Set_Find(Set *set,char *str);
+bool Set_Insert(Set *set,void *data,const char *str,uint32_t size);
+void *Set_Find(Set *set,const char *str);
 void Set_Free(Set *set);
 void Set_Clear(Set *set);
 void Set_Replace(Set *set,void *data,char *str,uint32_t size);
+
+uint32_t Elf_Hash(char *str);
 //void Set_Merge(Set *dst,Set *)
 #endif //LD_HASH_H
