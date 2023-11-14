@@ -6,6 +6,7 @@
 #define LD_GLOBALDEFS_H
 
 #include <elf.h>
+#include <stdio.h>
 #include "../utils/Hash.h"
 #include "SectionDef.h"
 
@@ -25,6 +26,9 @@ typedef struct _SymStore{
 #define GetSymStructFromSymSet(str,isDynamic) ((SymStore *)(Set_Find(GetCurSymSet(isDynamic),str)))
 #define GetCurSymSet(isDynamic) ((isDynamic)?&DynSymSet:&GlobalSymSet)
 extern Set GlobalSymSet,DynSymSet;
+extern char *outputFileName;
+extern FILE *outputFile;
+extern Elf64_Ehdr elfHeader;
 //extern Set sectionSet;
 //extern DynSection dynSection;
 //extern SymSection symSection;

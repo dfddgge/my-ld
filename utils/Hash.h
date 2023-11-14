@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include "list.h"
 
-uint8_t HashString(char *str);
+uint8_t HashString(const char *str);
 struct InSetUnit{
     List *data;
     char *str;
@@ -22,7 +22,7 @@ bool Set_Insert(Set *set,void *data,const char *str,uint32_t size);
 void *Set_Find(Set *set,const char *str);
 void Set_Free(Set *set);
 void Set_Clear(Set *set);
-void Set_Replace(Set *set,void *data,char *str,uint32_t size);
+void Set_Replace(Set *set,void *data,const char *str,uint32_t size);
 
 uint32_t Elf_Hash(char *str);
 //void Set_Merge(Set *dst,Set *)

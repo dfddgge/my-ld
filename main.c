@@ -12,13 +12,12 @@
 int Endianness;
 
 
-void DoOption(char *str);
+void DoOption(int argc,char **argv,int *optionIndex);
 int ReadFile(char *filename);
 
 int CheckHead(Elf64_Ehdr *ptr);
 int CheckPlatform(Elf64_Ehdr *head);
 enum Error{INVALID_ELF=1,FILE_IO_FAILED,INVALID_OPTION=-1};
-
 int main(int argc, char **argv){
 //    printf("%p\n",&MergeSymtab);
     Initialize();
@@ -63,9 +62,10 @@ int CheckHead(Elf64_Ehdr *head){
 //        return 0;
 //    }
     if(!memcmp(head->e_ident,"\x7f""ELF",4)){
-        if(head->e_ident[EI_VERSION]==ELFCLASS64){
+        if(head->e_ident[EI_CLASS]==ELFCLASS64){
             if(head->e_ident[EI_DATA]&3 && head->e_ident[EI_DATA]!=3){
                 Endianness=head->e_ident[EI_DATA]==ELFDATA2LSB;
+                elfHeader.e_ident[EI_DATA]=Endianness;
                 if(head->e_ident[EI_VERSION]==EV_CURRENT){
                     if(!*(int64_t *)(&head->e_ident[EI_PAD])){
 //                        isEverythingInitialed=1;
@@ -92,12 +92,20 @@ int ReadFile(char *filename){
     if((ret=CheckHead(&head)))return ret;
     return ProcessFile(f,&head);
 }
-void DoOption(char *str){
-    //No implementation
-    if(!strcmp(str,"-h")){
+void DoOption(int argc,char **argv,int *optionIndex){
+    if(!strcmp(argv[*optionIndex],"-h")){
         printf("This is a x86-64 elf linker!\n");
         exit(0);
     }
-    printf("%s is not a valid option\n",str);
+    else if(!strcmp(argv[*optionIndex],"-o")){
+        if(argc<=(++*optionIndex)){
+            printf("option -o should followed by output filename!\n");
+            exit(-1);
+        }
+        else{
+            outputFileName=argv[*optionIndex];
+        }
+    }
+    printf("%s is not a valid option\n",argv[*optionIndex]);
     exit(INVALID_OPTION);
 }

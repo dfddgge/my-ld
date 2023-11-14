@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include "Hash.h"
 
-uint8_t HashString(char *str){
+uint8_t HashString(const char *str){
     uint8_t res=0;
     while(*str){
         res^=*str;
@@ -16,7 +16,7 @@ uint8_t HashString(char *str){
 void Set_Initialize(Set *set){
     memset(set,0,sizeof(Set));
 }
-bool Set_Insert(Set *set, void *data, char *str,uint32_t size){
+bool Set_Insert(Set *set, void *data,const char *str,uint32_t size){
     uint8_t hash=HashString(str);
     struct InSetUnit *cur=&set->data[hash];
     struct InSetUnit *curFront=&set->data[hash];
@@ -32,7 +32,7 @@ bool Set_Insert(Set *set, void *data, char *str,uint32_t size){
     strcpy(cur->str,str);
     return true;
 }
-void *Set_Find(Set *set, char *str){
+void *Set_Find(Set *set,const char *str){
     uint8_t hash=HashString(str);
     struct InSetUnit *cur=&set->data[hash];
     while((cur=(struct InSetUnit *)cur->data->next)){
@@ -40,7 +40,7 @@ void *Set_Find(Set *set, char *str){
     }
     return NULL;
 }
-void Set_Replace(Set *set, void *data, char *str,uint32_t size){
+void Set_Replace(Set *set, void *data,const char *str,uint32_t size){
     uint8_t hash=HashString(str);
     struct InSetUnit *cur=&set->data[hash];
     while((cur=(struct InSetUnit *)cur->data->next)){
