@@ -10,11 +10,17 @@ uint8_t HashString(const char *str){
     uint8_t res=0;
     while(*str){
         res^=*str;
+        ++str;
     }
     return res;
 }
 void Set_Initialize(Set *set){
     memset(set,0,sizeof(Set));
+    for(int i=0;i<128;++i){
+        set->data[i].data=malloc(sizeof(List));
+        set->data[i].data->data=NULL;
+        set->data[i].data->next=NULL;
+    }
 }
 bool Set_Insert(Set *set, void *data,const char *str,uint32_t size){
     uint8_t hash=HashString(str);
@@ -26,8 +32,9 @@ bool Set_Insert(Set *set, void *data,const char *str,uint32_t size){
 //        cur=(struct InSetUnit *)cur->data->next;
     }
     cur=(struct InSetUnit *)(curFront->data->next=malloc(sizeof(struct InSetUnit)));
-    cur->data=malloc(size);
-    memcpy(curFront->data,data,size);
+    cur->data=malloc(sizeof(List));
+    cur->data->data=malloc(size);
+    memcpy(cur->data->data,data,size);
     cur->str=malloc(strlen(str)+1);
     strcpy(cur->str,str);
     return true;
@@ -45,9 +52,9 @@ void Set_Replace(Set *set, void *data,const char *str,uint32_t size){
     struct InSetUnit *cur=&set->data[hash];
     while((cur=(struct InSetUnit *)cur->data->next)){
         if(!strcmp(str,cur->str)){
-            free(cur->data);
-            cur->data=malloc(size);
-            memcpy(cur->data,data,size);
+            free(cur->data->data);
+            cur->data->data=malloc(size);
+            memcpy(cur->data->data,data,size);
             return;
         }
     }

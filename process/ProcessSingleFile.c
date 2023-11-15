@@ -16,12 +16,10 @@ int MergeSymtab(SectionDef *src,uint16_t symstr,bool isDynamic);
 //
 //void MergeDyntab(DynSection *glob, SectionDef *src);
 int ProcessFile(FILE *file, Elf64_Ehdr *head){
-//    if(){
-//        return 0;
-//    }
+    int ret=0;
     SectionDef *sections=curFileSections->sections=malloc(head->e_shnum*sizeof(SectionDef));
     curFileSections->sectionSize=head->e_shnum;
-//    uint32_t symTab,dynSec,symstr;
+    curFileSections->secSym=-1;
     fseek(file,(long)head->e_shoff,SEEK_SET);
     for(int i=0;i<head->e_shnum;++i){
         Elf64_Shdr secHeader;
@@ -31,11 +29,15 @@ int ProcessFile(FILE *file, Elf64_Ehdr *head){
         sections[i].sectionHeader=secHeader;
         char *data=NULL;
         if(secHeader.sh_type!=SHT_NOBITS){
+            uint64_t cur=ftell(file);
             fseek(file,(long)secHeader.sh_offset,SEEK_SET);
             data=malloc(secHeader.sh_size);
+            fread(data,secHeader.sh_size,1,file);
+            fseek(file,cur,SEEK_SET);
         }
+        sections[i].secAddr=data;
 //        SectionDef_Insert(&sections[i],secHeader.sh_addralign,data,secHeader.sh_size);
-        if(secHeader.sh_type==SHT_STRTAB&&!memcmp(data,".shstrtab",sizeof(".shstrtab"))){sections[i].isNotProcessSec=1, curFileSections->secShStr=i; }
+        if(secHeader.sh_type==SHT_STRTAB&&!memcmp(data+secHeader.sh_name,".shstrtab",sizeof(".shstrtab"))){sections[i].isNotProcessSec=1, curFileSections->secShStr=i; }
 //        else if(secHeader.sh_type==SHT_HASH) curFileSections->hash=i;
     }
     for(int i=0;i<head->e_shnum;++i){
@@ -45,10 +47,11 @@ int ProcessFile(FILE *file, Elf64_Ehdr *head){
         else if(len==8&&!strcmp(sections[i].sectionName,".dynamic")){sections[i].isNotProcessSec=1; curFileSections->secDyn=i; }
         else if(len==7&&((!curFileSections->isDynamicLib&&!strcmp(sections[i].sectionName,".strtab"))||(curFileSections->isDynamicLib&&!strcmp(sections[i].sectionName,".dynstr")))){sections[i].isNotProcessSec=1; curFileSections->symstr=i; }
     }
-    if(MergeSymtab(&sections[curFileSections->secSym],curFileSections->symstr,curFileSections->isDynamicLib)) return -1;
+    if(curFileSections->secSym!=-1&&MergeSymtab(&sections[curFileSections->secSym],curFileSections->symstr,curFileSections->isDynamicLib)) ret=-1;
+    fclose(file);
 //    not_used_todo:process .dynamic and .dynsym etc on dynamic lib
 //   reason:process in link and relocate
-    return 0;
+    return ret;
 }
 //void MergeDyntab(DynSection *glob, SectionDef *src){
 //}
@@ -61,6 +64,7 @@ int ProcessFile(FILE *file, Elf64_Ehdr *head){
 int MergeSymtab(SectionDef *src,uint16_t symstr,bool isDynamic){
     int ret=0;
     Elf64_Sym *info=(Elf64_Sym *)(src->secAddr);
+    if(!src->sectionHeader.sh_size) return 0;
     unsigned long num=src->sectionHeader.sh_size/src->sectionHeader.sh_entsize;
     for(int i=1;i<num;++i){
         char *name=&((char *)curFileSections->sections[symstr].secAddr)[info[i].st_name];
