@@ -75,6 +75,7 @@ uint64_t bss_align=8;
 uint64_t vMemAfterBSS;
 
 uint64_t *outputSymNameOffset;
+Set OutDynSymSet;
 //int RelocateLocal(FileSections *fileSections,int i);
 uint64_t Align(uint64_t wait,uint64_t align);//align should be pow of 2.
 int RelocateGlobal(FileSections *fileSections,int curFileIndex);
@@ -94,6 +95,7 @@ int LinkAndRelocate(FileSections *fileSections, int inputfileNum){
     WrappedList_Initialize(&outputDynSym);
     WrappedList_Initialize(&pltAddrs);
     Set_Initialize(&pltSet);
+    Set_Initialize(&OutDynSymSet);
     int ret=0;
     Set_Initialize(&outputSections);
     dynamics=malloc(inputfileNum*sizeof(int));
@@ -323,6 +325,7 @@ int LinkAndRelocate(FileSections *fileSections, int inputfileNum){
     outputFileOffset=Align(outputFileOffset,0x1000);
     vMemAfterBSS=Align(vMemAfterBSS,0x1000);
     SymStore *store=GetSymStructFromSymSet("_start",0);
+
     if(!store){
         printf("Undefined entry point _start!\n");
         exit(-1);
@@ -330,11 +333,12 @@ int LinkAndRelocate(FileSections *fileSections, int inputfileNum){
     const char *name=fileSections[store->fileIndex].sections[store->sym_info.st_shndx].sectionName;
     OutputSectionList *list=Set_Find(&outputSections,name);
     uint64_t value=list->offset+fileSections[store->fileIndex].sections[store->sym_info.st_shndx].outputOffset;
-    elfHeader.e_entry=value;
+    elfHeader.e_entry=value+0x8004000;
     elfHeader.e_shnum=secCount+EXTRA_NO_PROGRAM_BIT_SECTION_COUNT;
     elfHeader.e_shoff=outputFileOffset;
     elfHeader.e_shstrndx=SHSTRTAB_SECTION_INDEX;
     elfHeader.e_phnum=elfHeader.e_shnum;
+
     outputFile=fopen(outputFileName,"wb");
     if(!outputFile){
         printf("cannot open output file %s!\n",outputFileName);
@@ -387,6 +391,7 @@ int LinkAndRelocate(FileSections *fileSections, int inputfileNum){
         for(uint64_t i=curOffset;i<sectionHeader[GOT_SECTION_INDEX].sh_offset;++i) fputc(0,outputFile);
     }
     curOffset=sectionHeader[GOT_SECTION_INDEX].sh_offset;
+    fileOffset=ftell(outputFile);
     char nullPtr[8]={0};
     fwrite(&sectionHeader[DYNAMIC_SECTION_INDEX].sh_addr,8,1,outputFile);
     fwrite(nullPtr,8,1,outputFile);
@@ -394,7 +399,7 @@ int LinkAndRelocate(FileSections *fileSections, int inputfileNum){
 
     for(uint64_t i=0;i<pltIndex;++i){
         uint64_t addr=sectionHeader[PLT_SECTION_INDEX].sh_addr+i*sizeof(MyPltData)+5;
-        fwrite(&addr,sizeof(MyPltData),1,outputFile);
+        fwrite(&addr,sizeof(void *),1,outputFile);
     }
     curOffset+=sectionHeader[GOT_SECTION_INDEX].sh_size;
     if(curOffset<sectionHeader[DYNSYM_SECTION_INDEX].sh_offset){
@@ -463,7 +468,6 @@ int LinkAndRelocate(FileSections *fileSections, int inputfileNum){
         for(uint64_t i=curOffset;i<sectionHeader[SHSTRTAB_SECTION_INDEX].sh_offset;++i) fputc(0,outputFile);
     }
     curOffset=sectionHeader[SHSTRTAB_SECTION_INDEX].sh_offset;
-    fileOffset=ftell(outputFile);
     for(int i=0;i<secCount+EXTRA_NO_PROGRAM_BIT_SECTION_COUNT;++i){
         fwrite(sectionNames[i],strlen(sectionNames[i]),1,outputFile);
         fputc(0,outputFile);
@@ -499,7 +503,6 @@ int LinkAndRelocate(FileSections *fileSections, int inputfileNum){
     }
 
     curOffset+=sectionHeader[DYNSTR_SECTION_INDEX].sh_size;
-
     if(curOffset<sectionHeader[RELA_DYN_SECTION_INDEX].sh_offset){
         for(uint64_t i=curOffset;i<sectionHeader[RELA_DYN_SECTION_INDEX].sh_offset;++i) fputc(0,outputFile);
     }
@@ -569,7 +572,7 @@ int RelocateGlobal(FileSections *fileSections,int curFileIndex){
                 while(((OutputSectionUnit *)(sectionList->data))->fileIndex!=curFileIndex){
                     sectionList=sectionList->next;
                     if(!sectionList){
-                        printf("Relocation Section %s has no matched target Section!\n",curSection->sectionName);
+                        printf("Relocation Section %s in file %s has no matched target Section!\n",curSection->sectionName,inputfiles[curFileIndex]);
                         ret=1;
                         goto NextRelSec;
                     }
@@ -583,53 +586,53 @@ int RelocateGlobal(FileSections *fileSections,int curFileIndex){
                     Elf64_Sym *symArray=(Elf64_Sym *)curFile->sections[curFile->secSym].secAddr;
                     SectionDef *curFileSym=&curFile->sections[curFile->secSym];
                     const char *curFileSymStr=curFile->sections[curFile->symstr].secAddr;
-                    const char *name=&curFileSymStr[symIndex];
-                    for(int j=0;j<curFileSym->sectionHeader.sh_size/curFileSym->sectionHeader.sh_entsize;++j){
-                        if(symArray[j].st_name==symIndex){
-                            Elf64_Sym sym;
-                            int symFileIndex;
-                            if(symArray[j].st_shndx==STN_UNDEF){
-                                SymStore *symStore=GetSymStructFromSymSet(name,0);
-                                if(!symStore||symStore->sym_info.st_shndx==STN_UNDEF){//Dynamic linking
-                                    if(!(symStore=Set_Find(&DynSymSet,name))||symStore->sym_info.st_shndx==STN_UNDEF){
-                                        symStore=GetSymStructFromSymSet(name,1);//in dynamic lib
-                                        if(!symStore||(symStore->sym_info.st_shndx=SHN_UNDEF&&ELF64_ST_BIND(symStore->sym_info.st_info)!=STB_WEAK)){
-                                            printf("Undefined reference of symbol %s\n",name);
-                                            continue;
-                                        }
-                                        Set_Insert(&DynSymSet,symStore,name,sizeof(*symStore));
-                                        List *list=malloc(sizeof(SymStore));
-                                        SymStore *newSym=malloc(sizeof(SymStore));
-                                        list->data=newSym;
-                                        *newSym=*symStore;
-                                        WrappedList_insert_last(&outputDynSym,list);
-                                        newSym->outIndex=DynSymCount;
-                                        ++DynSymCount;
-                                    }
-                                    curFileIndex=symStore->fileIndex;
-                                    List *list=malloc(sizeof(SymStore));
-                                    list->data=malloc(sizeof(Elf64_Rela));
-                                    WrappedList_insert_last(&outputRela,list);
-                                    ++dynRelaCount;
-                                    Elf64_Rela *relStruct=(Elf64_Rela *)list->data;
-                                    *relStruct=relArray[j];
-                                    relStruct->r_offset+=targetSection->offset;
-                                    symFileIndex=symStore?symStore->fileIndex:-1;
-//                                    relStruct->r_info=ELF64_R_INFO(symStore->outIndex,R_X86_64_GLOB_DAT);
+                    int j=symIndex;
+                    Elf64_Sym sym;
+                    const char *name=&curFileSymStr[symArray[j].st_name];
+                    int symFileIndex;
+                    Elf64_Rela *relStruct=&relArray[j];
+                    if(symArray[j].st_shndx==STN_UNDEF){
+                        SymStore *symStore=GetSymStructFromSymSet(name,0);
+                        if(!symStore||symStore->sym_info.st_shndx==STN_UNDEF){//Dynamic linking
+                            if(!(symStore=Set_Find(&OutDynSymSet,name))||symStore->sym_info.st_shndx==STN_UNDEF){
+                                symStore=GetSymStructFromSymSet(name,1);//in dynamic lib
+                                if(!symStore||(symStore->sym_info.st_shndx=SHN_UNDEF&&ELF64_ST_BIND(symStore->sym_info.st_info)!=STB_WEAK)){
+                                    printf("Undefined reference of symbol %s\n",name);
+                                    continue;
                                 }
-                                else{//global definition
-                                    sym=symStore->sym_info;
-                                    symFileIndex=symStore->fileIndex;
-                                }
+                                Set_Insert(&OutDynSymSet,symStore,name,sizeof(*symStore));
+                                List *list=malloc(sizeof(SymStore));
+                                SymStore *newSym=malloc(sizeof(SymStore));
+                                list->data=newSym;
+                                *newSym=*symStore;
+                                WrappedList_insert_last(&outputDynSym,list);
+                                newSym->outIndex=DynSymCount;
+                                symStore->outIndex=DynSymCount;
+                                ++DynSymCount;
                             }
-                            else{//local definition
-                                sym=symArray[j];
-                                symFileIndex=curFileIndex;
-                            }
-                            RelocateSym(fileSections,name, &sym, &relArray[i], curFileIndex, symFileIndex, targetSection,
-                                        targetOffset);
+//                            curFileIndex=symStore->fileIndex;
+                            List *list=malloc(sizeof(SymStore));
+                            list->data=malloc(sizeof(Elf64_Rela));
+                            WrappedList_insert_last(&outputRela,list);
+                            ++dynRelaCount;
+                            Elf64_Rela *relStruct=(Elf64_Rela *)list->data;
+                            *relStruct=relArray[j];
+                            relStruct->r_offset+=targetSection->offset;
+                            relStruct->r_info=(relStruct->r_info&0xffffffff)|((symStore?symStore->outIndex:0ll)<<32);
+                            symFileIndex=symStore?symStore->fileIndex:-1;
+//                            relStruct->r_info=ELF64_R_INFO(symStore->outIndex,R_X86_64_GLOB_DAT);
+                        }
+                        else{//global definition
+                            sym=symStore->sym_info;
+                            symFileIndex=symStore->fileIndex;
                         }
                     }
+                    else{//local definition
+                        sym=symArray[j];
+                        symFileIndex=curFileIndex;
+                    }
+                    RelocateSym(fileSections,name, &sym, relStruct, curFileIndex, symFileIndex, targetSection,
+                                targetOffset);
                 }
             }
         }
@@ -689,7 +692,8 @@ void RelocateSym(FileSections *fileSections, const char *symName, Elf64_Sym *sym
             }
             int32_t pc=(int32_t)(targetSection->offset+targetOffset+rel->r_addend);
             *(int32_t *)(&targetSection->addr[targetOffset])=(int32_t)(value+vMemAfterBSS-pc);
-            rel->r_info=(rel->r_info&0xff00)|R_X86_64_GLOB_DAT;
+            rel->r_info=(rel->r_info&0xffffffff00000000)|R_X86_64_GLOB_DAT;
+//            ++dynRelaCount;
             break;
         }
         default:
@@ -714,6 +718,7 @@ void MergeOffset(FileSections *fileSections){
             OutputSectionList *list=((OutputSectionList *)p->data->data);
             Elf64_Shdr *singleSecHeader=((OutputSectionUnit *)list->begin->data)->header;
             if(outputFileOffset&0xfff) outputFileOffset=(outputFileOffset&~(0xfff))+0x1000;
+            list->offset=outputFileOffset;
             strOffset[segmentIndex]=strOffset[segmentIndex-1]+strlen(sectionNames[segmentIndex-1])+1;
             SetProgramHeader(&programHeader[segmentIndex],list->alignBit,list->size,PF_R|((list->flag&SHF_WRITE)?PF_W:0)|((list->flag&SHF_EXECINSTR)?PF_X:0),
                              list->size,outputFileOffset,0x8004000+outputFileOffset,PT_LOAD,0x8004000+outputFileOffset);
