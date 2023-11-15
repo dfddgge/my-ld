@@ -95,7 +95,8 @@ int ReadFile(char *filename){
 }
 void DoOption(int argc,char **argv,int *optionIndex){
     if(!strcmp(argv[*optionIndex],"-h")){
-        printf("This is a x86-64 elf linker!\n");
+        printf("This is a x86-64 elf linker!\n Usage:ld file1 [file2...][-o outputfile][-h]\n Attention, clib won't "
+               "link by default\n");
         exit(0);
     }
     else if(!strcmp(argv[*optionIndex],"-o")){
